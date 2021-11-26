@@ -271,15 +271,3 @@ result_mean.loc[pd.isna(result_mean['SDR']), 'SDR'] = 0
 result_mean['y'] = result_mean['amount']
 result_mean.to_csv('/Users/ZC/Documents/company/promotion/result/0042-1038-1119-01-90%-targetlog-indepnorm-boostingavg-n_select=3.csv')
 print('模型训练时触发try：', '\n', tuning, '\n', no_tune)
-
-
-# interpret_model(best[0], plot='correlation')
-'''
-log3:
-1.4828 0.6256 29.1525 0.3388
-log2:
-1.4769 0.6353 25.5572 0.4139
-n_select=3, n_estimators=10：
-1.4792 0.6066 28.4664 0.3696
-1.4754 0.6112 28.4464 0.3704
-'''
