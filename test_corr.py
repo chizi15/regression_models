@@ -17,21 +17,24 @@ pd.set_option('display.max_columns', None)
 
 
 # 设置变量参数和模型超参数等
-data_use = train_data_001
-label = ['y_log']
-feature = 'price_level'
+data_number = 0
+label = ['y_log']  # 'y_ori', 'y_log', 'y_comps'
+feature = ['price_level', 'price', 'pro_day', 'stock_begin', 'distance_day', 'month_diff']
+corr_level = abs(np.array([-0.7, -0.65, -0.55, 0.6, 0.5, 0.6]))
 r = 0.9
+weighted_type = 'amean_sigmoid'
+weighted_len = 42
 iden_feat = ['organ', 'code', 'busdate', 'class', 'bigsort', 'midsort', 'sort']  # 7
-cate_feat = ['weekend']  # 1, 'promotion_type', 'workday'
+cate_feat = ['weekend', 'workday']  # 2, 'promotion_type'
 numb_feat = ['weekday', 'year', 'month', 'day', 'distance_day', 'pro_day', 'costprice', 'price', 'price_level',
-             'stock_begin', 'mean_code', 'mean_sort', 'mean_mid', 'mean_big',  'mean_class',
-             'mean_weighted_rolling', 'mean_weighted_group']  # 20, 'mark_1', 'mark_2', 'festival_num', 'month_diff',
+             'stock_begin', 'mean_code', 'mean_sort', 'mean_mid', 'mean_big',  'mean_class', 'month_diff',
+             'mean_weighted_rolling', 'mean_weighted_group']  # 20, 'std_code', 'std_sort', 'std_mid', 'std_big', 'std_class',
 numb_feat_lunar = ['weekday', 'LunarYear', 'LunarMonth', 'LunarDay', 'distance_day', 'pro_day', 'costprice', 'price', 'price_level',
                    'stock_begin', 'mean_code', 'std_code', 'mean_sort', 'std_sort', 'mean_mid', 'std_mid', 'mean_big', 'std_big', 'mean_class', 'std_class',
                    'mean_weighted_rolling', 'mean_weighted_group']  # 20, 'mark_1', 'mark_2', 'festival_num', 'month_diff',
 feat = cate_feat + numb_feat  # 22
 feat_lunar = cate_feat + numb_feat_lunar  # 22
-flexible = ['festival_num', 'mark_1', 'mark_2', 'workday']  # 4
+flexible = ['festival_num', 'mark_1', 'mark_2']  # 3
 
 # cpnid, organ = '0042', '1038'
 # bucket_name = 'wuerp-nx'
@@ -98,7 +101,7 @@ for i in lunar_num:
 
 data = []
 data.extend((train_data_01, train_data_00))
-for i in range(len(train_data_split)):
+for i in range(len(train_data_split)):  # for loop variable i is a global variable
     data.append(train_data_split[i])
 
 train_data_011 = train_data_01[train_data_01['promotion_type']==1]  # 非节日工作日店促,50497
@@ -107,51 +110,56 @@ train_data_001 = train_data_00[train_data_00['promotion_type']==1]  # 非节日�
 train_data_002 = train_data_00[train_data_00['promotion_type']==2]  # 非节日非工作日档期,29722
 data.extend((train_data_011, train_data_012, train_data_001, train_data_002))
 
+##################################################################################################
+data_use = data[data_number]
 
-#################################################
+unit_codes = data_use['code'].drop_duplicates()
+corr_code_select = pd.DataFrame()
+for j in range(len(feature)):
+# for j in [0,1]:
+    result = Parallel(n_jobs=4, backend="multiprocessing", verbose=1, batch_size=4*4) \
+        (delayed(ref.regression_correlaiton_single)
+         (data_use[data_use['code']==unit_codes.iloc[i]][feature[j]],
+          data_use[data_use['code']==unit_codes.iloc[i]][label[0]], type='high')
+         for i in range(len(unit_codes)))  # loop variable i in delayed is local variable
+    corr_result = [result[i][0]['correlation'].values[0] for i in range(len(result))]
+    d = {'code': list(unit_codes.values), 'corr': corr_result}
+    corr_code = pd.DataFrame(d, index=unit_codes.index.values)
+    print('\n', '本数据集总单品数：', len(unit_codes), '\n', '相关性非空的单品：', len(corr_code[corr_code['corr'].notna()]), '\n',
+          '相关性非空单品占比(%)：', round(len(corr_code[corr_code['corr'].notna()])/len(unit_codes)*100, 2))
+    len_single = len(corr_code_select)
+    corr_code_select = corr_code_select.append(corr_code[abs(corr_code['corr']) > corr_level[j]])
+    print('\n', f'特征{feature[j]}与应变量{label[0]}间相关性绝对值大于{corr_level[j]}的单品数有{len(corr_code_select)-len_single}个', '\n')
+corr_code_select_union = corr_code_select['code'].drop_duplicates()
+print('\n', '符合条件的单品数：', len(corr_code_select_union), '\n', '符合条件的单品数与本数据集总单品数之比：(%)', round(len(corr_code_select_union)/len(unit_codes)*100, 2))
+samps_select = pd.DataFrame()
+for i in range(len(corr_code_select_union)):
+    samps_select = pd.concat([samps_select, data_use[data_use['code']==corr_code_select_union.values[i]]])
+print('\n', '符合条件的样本数：', len(samps_select), '\n', '符合条件的样本数与本数据集总样本数之比：(%)', round(len(samps_select)/len(data_use)*100, 2))
+
+# generating grouped rolling weighted average and grouped weighted average for individual maped data, compared to the whole data mean.
 df_group, df_rolling, df_code, codes = pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), list()
-data = data_use[['busdate', 'amount', 'class', 'bigsort', 'midsort', 'sort', 'code']][:]
-grouped = data.groupby(['class', 'bigsort', 'midsort', 'sort', 'code'])
+data_partn = samps_select[['busdate', 'amount', 'class', 'bigsort', 'midsort', 'sort', 'code']][:]
+grouped = data_partn.groupby(['class', 'bigsort', 'midsort', 'sort', 'code'])
 for code, group in grouped:
     codes.append(code[-1])
     df_group = pd.concat([df_group, group])
 result_group = Parallel(n_jobs=4, backend="multiprocessing", verbose=1, batch_size=4*4) \
-    (delayed(ref.dyn_seri_weighted)(group['amount'][:42], type='amean_sigmoid', critical_y=(1e-10, 0.15, 0.5, 1)) for code, group in grouped)
+    (delayed(ref.dyn_seri_weighted)(group['amount'][-weighted_len:], type=weighted_type, critical_y=(1e-10, 0.1, 0.4, 1)) for code, group in grouped)
 # result_group的值匹配codes中的值
 df_code['code'], df_code['mean_weighted_group'] = codes, result_group
 
-grouped_rolling = data.groupby(['class', 'bigsort', 'midsort', 'sort', 'code']).rolling(window=42, min_periods=1, center=False, closed='both')
-for rolling in grouped_rolling:
-    df_rolling = df_rolling.append(rolling)  # unnecessary
+grouped_rolling = data_partn.groupby(['class', 'bigsort', 'midsort', 'sort', 'code']).rolling(window=weighted_len, min_periods=1, center=False, closed='both')
+# for rolling in grouped_rolling:
+#     df_rolling = df_rolling.append(rolling)  # unnecessary
 result_rolling = Parallel(n_jobs=4, backend="multiprocessing", verbose=1, batch_size=4*4) \
-    (delayed(ref.dyn_seri_weighted)(rolling['amount'], type='amean_sigmoid', critical_y=(1e-10, 0.15, 0.5, 1)) for rolling in grouped_rolling)
+    (delayed(ref.dyn_seri_weighted)(rolling['amount'], type=weighted_type, critical_y=(1e-10, 0.1, 0.4, 1)) for rolling in grouped_rolling)
 # result_rolling的值匹配df_group的索引
 df_group['mean_weighted_rolling'] = result_rolling
 df_rolling_group = pd.merge(df_group, df_code, how='left', on=['code'])
 df_rolling_group.drop(columns=['amount'], inplace=True)
 
-data_use = pd.merge(data_use, df_rolling_group, how='left', on=['busdate', 'class', 'bigsort', 'midsort', 'sort', 'code'])
-
-# data_use[data_use['code']==data_use['code'][1]][['busdate', 'amount', 'mean_code', 'mean_weighted_rolling', 'mean_weighted_group']]
-
-coor = []
-unit_codes = data_use['code'].drop_duplicates()
-result = Parallel(n_jobs=4, backend="multiprocessing", verbose=1, batch_size=4*4) \
-    (delayed(ref.regression_correlaiton_single)
-     (data_use[data_use['code']==unit_codes.iloc[i]][feature],
-      data_use[data_use['code']==unit_codes.iloc[i]][label[0]], type='high')
-     for i in range(len(unit_codes)))
-corr_result = [result[i][0]['correlation'].values[0] for i in range(len(result))]
-d = {'code': list(unit_codes.values), 'corr': corr_result}
-corr_code = pd.DataFrame(d, index=unit_codes.index.values)
-print('\n', '本数据集总单品数：', len(unit_codes), '\n', '相关性非空的单品：', len(corr_code[corr_code['corr'].notna()]), '\n',
-      '相关性非空单品占比(%)：', round(len(corr_code[corr_code['corr'].notna()])/len(unit_codes)*100, 2))
-corr_code_select = corr_code[corr_code['corr']<-0.3]
-print('\n', '符合条件的单品数：', len(corr_code_select), '\n', '符合条件的单品数与本数据集总单品数之比：(%)', round(len(corr_code_select)/len(unit_codes)*100, 2))
-samps_select = pd.DataFrame()
-for i in range(len(corr_code_select)):
-    samps_select = pd.concat([samps_select, data_use[data_use['code']==corr_code_select['code'].values[i]]])
-print('\n', '符合条件的样本数：', len(samps_select), '\n', '符合条件的样本数与本数据集总样本数之比：(%)', round(len(samps_select)/len(data_use)*100, 2))
+samps_select_rolling_group = pd.merge(samps_select, df_rolling_group, how='left', on=['busdate', 'class', 'bigsort', 'midsort', 'sort', 'code'])
 
 # pred_select = pd.DataFrame()
 # for i in range(len(corr_code_select)):
@@ -159,6 +167,7 @@ print('\n', '符合条件的样本数：', len(samps_select), '\n', '符合条�
 
 
 ########################################
+# coor = []
 # for n in range(len(samps_select)):
 #     coor.append(ref.regression_correlaiton_single(
 #         samps_select[samps_select['code']==samps_select['code'].iloc[n]][feat],
@@ -211,9 +220,9 @@ print('\n', '符合条件的样本数：', len(samps_select), '\n', '符合条�
 # print(pd.Series(data_len).describe())
 
 data_len, data_train, data_unseen = [], [], []
-data_train.append(samps_select[(samps_select['busdate'] < samps_select.iloc[:int(len(samps_select) * r)]['busdate'].values[-1])])
-data_unseen.append(samps_select[~(samps_select['busdate'] < samps_select.iloc[:int(len(samps_select) * r)]['busdate'].values[-1])])
-# data_len.append(len(samps_select))
+data_train.append(samps_select_rolling_group[(samps_select_rolling_group['busdate'] < samps_select_rolling_group.iloc[:int(len(samps_select_rolling_group) * r)]['busdate'].values[-1])])
+data_unseen.append(samps_select_rolling_group[~(samps_select_rolling_group['busdate'] < samps_select_rolling_group.iloc[:int(len(samps_select_rolling_group) * r)]['busdate'].values[-1])])
+# data_len.append(len(samps_select_rolling_group))
 # print(len(data_train[i]), len(data_unseen[i]))
 # print(pd.Series(data_len).describe())
 print('参与训练的单品数：', len(data_train[0]['code'].value_counts()))
@@ -242,7 +251,7 @@ for i in [0]:
                     data_split_shuffle=False, fold_strategy='timeseries', fold=2,
                     remove_multicollinearity=True, multicollinearity_threshold=0.9, session_id=1,
                     transformation=True,  transformation_method='yeo-johnson', normalize=True, normalize_method='robust',
-                    feature_ratio=True, interaction_threshold=0.01,
+                    feature_ratio=False, interaction_threshold=0.01,
                     remove_outliers=False, outliers_threshold=10/len(data_train[i]),
                     transform_target=False, transform_target_method='yeo-johnson')
     elif i in np.array(lunar_num)+2:  # 将两个较大的非节假日的两个数据集放在前面
@@ -305,6 +314,7 @@ for i in [0]:
                 no_tune.append(best[j])
         final_model_use = finalize_model(ensembled)
         if i in np.array(lunar_num)+2:  # 农历节假日
+            # features in predict data which don't appear in train data will not be used in forecast
             pred = predict_model(final_model_use, data=data_unseen[i][iden_feat+flexible+feat_lunar+label+['amount']])  # 预测数据中的列需包含（即大于等于）训练数据中的列
         else:  # 非农历节假日
             pred = predict_model(final_model_use, data=data_unseen[i][iden_feat+flexible+feat+label+['amount']])
@@ -354,7 +364,7 @@ result_mean.loc[result_mean['SDR'] == np.inf, 'SDR'] = 2*abs(result_mean['amount
 # when (result_mean['amount'] + result_mean['yhat'])==0 and 2*abs(result_mean['amount'] - result_mean['yhat'])==0, result_mean['SDR'] is NaN, then completely acurate
 result_mean.loc[pd.isna(result_mean['SDR']), 'SDR'] = 0
 result_mean['y'] = result_mean['amount']
-result_mean.to_csv('/Users/ZC/Documents/company/promotion/result/0042-1038-0118-corr_pl-90%-y_log-indepyj-boostingavg-n_select=3.csv')
+result_mean.to_csv('/Users/ZC/Documents/company/promotion/result/0042-1038-0121-corr_pl-90%-y_log-indepyj-boostingavg-n_select=3.csv')
 
 """
 1.1651 0.6075 9.77108141919013 0.796
