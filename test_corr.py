@@ -17,10 +17,10 @@ pd.set_option('display.max_columns', None)
 
 
 # 设置变量参数和模型超参数等
-data_number = 0
+data_number = -1
 label = ['y_log']  # 'y_ori', 'y_log', 'y_comps'
 feature = ['price_level', 'price', 'pro_day', 'stock_begin', 'distance_day', 'month_diff']
-corr_level = abs(np.array([-0.7, -0.65, -0.55, 0.6, 0.5, 0.6]))
+corr_level = abs(np.array([-0.65, -0.65, -0.55, 0.6, 0.5, 0.6]))
 r = 0.9
 weighted_type = 'amean_sigmoid'
 weighted_len = 42
@@ -116,7 +116,6 @@ data_use = data[data_number]
 unit_codes = data_use['code'].drop_duplicates()
 corr_code_select = pd.DataFrame()
 for j in range(len(feature)):
-# for j in [0,1]:
     result = Parallel(n_jobs=4, backend="multiprocessing", verbose=1, batch_size=4*4) \
         (delayed(ref.regression_correlaiton_single)
          (data_use[data_use['code']==unit_codes.iloc[i]][feature[j]],
@@ -134,8 +133,11 @@ corr_code_select_union = corr_code_select['code'].drop_duplicates()
 print('\n', '符合条件的单品数：', len(corr_code_select_union), '\n', '符合条件的单品数与本数据集总单品数之比：(%)', round(len(corr_code_select_union)/len(unit_codes)*100, 2))
 samps_select = pd.DataFrame()
 for i in range(len(corr_code_select_union)):
+    # 这一步操作会打乱samps_select中busdate的升序排列，对后面截取训练集、预测集，以及训练和预测造成逻辑错误，对于时间序列问题，df需按升序排列
     samps_select = pd.concat([samps_select, data_use[data_use['code']==corr_code_select_union.values[i]]])
 print('\n', '符合条件的样本数：', len(samps_select), '\n', '符合条件的样本数与本数据集总样本数之比：(%)', round(len(samps_select)/len(data_use)*100, 2))
+# 将被打乱顺序的samps_select按busdate升序恢复成正常时间顺序，以保证后续逻辑正确
+samps_select.sort_values(by=['busdate'], inplace=True)
 
 # generating grouped rolling weighted average and grouped weighted average for individual maped data, compared to the whole data mean.
 df_group, df_rolling, df_code, codes = pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), list()
@@ -220,8 +222,12 @@ samps_select_rolling_group = pd.merge(samps_select, df_rolling_group, how='left'
 # print(pd.Series(data_len).describe())
 
 data_len, data_train, data_unseen = [], [], []
-data_train.append(samps_select_rolling_group[(samps_select_rolling_group['busdate'] < samps_select_rolling_group.iloc[:int(len(samps_select_rolling_group) * r)]['busdate'].values[-1])])
-data_unseen.append(samps_select_rolling_group[~(samps_select_rolling_group['busdate'] < samps_select_rolling_group.iloc[:int(len(samps_select_rolling_group) * r)]['busdate'].values[-1])])
+# 以日期为界限进行筛选
+data_train.append(samps_select_rolling_group[(pd.to_datetime(samps_select_rolling_group['busdate']) < samps_select_rolling_group.iloc[:int(len(samps_select_rolling_group) * r)]['busdate'].values[-1])])
+data_unseen.append(samps_select_rolling_group[~(pd.to_datetime(samps_select_rolling_group['busdate']) < samps_select_rolling_group.iloc[:int(len(samps_select_rolling_group) * r)]['busdate'].values[-1])])
+# # 以索引为界限进行筛选
+# data_train.append(samps_select_rolling_group.iloc[:int(len(samps_select_rolling_group) * r)])
+# data_unseen.append(samps_select_rolling_group[int(len(samps_select_rolling_group) * r):])
 # data_len.append(len(samps_select_rolling_group))
 # print(len(data_train[i]), len(data_unseen[i]))
 # print(pd.Series(data_len).describe())
@@ -369,5 +375,5 @@ result_mean.to_csv('/Users/ZC/Documents/company/promotion/result/0042-1038-0121-
 """
 1.1651 0.6075 9.77108141919013 0.796
 0.9225 0.5263 11.641784773144042 0.7308
-
+1.1919 0.4077 8.721994820209305 0.64
 """
