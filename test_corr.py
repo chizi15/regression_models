@@ -1,24 +1,23 @@
 import pandas as pd
 import numpy as np
-import lightgbm as lgb
 from sklearn import metrics
-from data_tools import get_processed_data, get_data_from_s3, process_data
-from preprocess import his_mean
 from sklearn.model_selection import train_test_split
 from pycaret.regression import *
 from borax.calendars.lunardate import LunarDate
-import datetime
+from joblib import Parallel, delayed
 import sys
+sys.path.append('/Users/ZC/PycharmProjects/PythonProjectProf/promotion/')
+from data_tools import get_data_from_s3, process_data
+from preprocess import his_mean
 sys.path.insert(0, '/Users/ZC/PycharmProjects/PythonProjectProf/functions/')
 import regression_evaluation_def as ref
-from joblib import Parallel, delayed
 pd.set_option('display.max_columns', None)
 # pd.set_option('display.max_rows', 20)
 
 
 # 设置变量参数和模型超参数等
-data_number = 0
-label = ['y_log']  # 'y_ori', 'y_log', 'y_comps'
+data_number = 1
+label = ['y_ori']  # 'y_ori', 'y_log', 'y_comps'
 feature = ['price_level', 'price', 'pro_day', 'stock_begin', 'distance_day', 'month_diff']
 corr_level = abs(np.array([-0.65, -0.65, -0.55, 0.6, 0.5, 0.6]))
 r = 0.9
@@ -375,7 +374,7 @@ result_mean.loc[result_mean['SDR'] == np.inf, 'SDR'] = 2*abs(result_mean['amount
 # when (result_mean['amount'] + result_mean['yhat'])==0 and 2*abs(result_mean['amount'] - result_mean['yhat'])==0, result_mean['SDR'] is NaN, then completely acurate
 result_mean.loc[pd.isna(result_mean['SDR']), 'SDR'] = 0
 result_mean['y'] = result_mean['amount']
-result_mean.to_csv('/Users/ZC/Documents/company/promotion/result/0042-1038-0121-corr_pl-90%-y_log-indepyj-boostingavg-n_select=3.csv')
+result_mean.to_csv('/Users/ZC/Documents/company/promotion/result/0042-1038-0125-corr_pl-90%-y_log-indepyj-boostingavg-n_select=3.csv')
 
 """
 1.1651 0.6075 9.77108141919013 0.796
