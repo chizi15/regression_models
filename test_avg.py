@@ -55,17 +55,9 @@ from sklearn import metrics
 pd.set_option('display.max_columns', None)
 # pd.set_option('display.max_rows', 20)
 
-# cpnid, organ = '0042', '1038'
-# bucket_name = 'wuerp-nx'
-# train_raw = get_data_from_s3(bucket_name, 'train', cpnid, organ)
-# train_raw.to_csv('/Users/ZC/Documents/company/promotion/0042-1038-train.csv', index=False)
-# print('\n', '促销样本量：%.d' % (len(train_raw)-train_raw.isna().sum().max()), '\n')
-# print('促销样本占总样本的百分比：%.3f' % ((1-train_raw.isna().sum().max()/len(train_raw))*100), '\n')
-
 
 # 读取数据并做一些预处理和初步的特征工程
-train_raw = pd.read_csv('/Users/ZC/Documents/company/promotion/0042-1038-train.csv')
-# train_raw = pd.read_csv('/Users/ZC/Documents/company/promotion/0042/1021/train.csv')
+train_raw = pd.read_csv('/Users/ZC/Documents/company/promotion/train.csv')
 print(train_raw.isnull().sum(), '\n')
 # train_raw = train_raw[train_raw['flag'] == '促销']
 train_raw = train_raw[(train_raw['price']>0) & (train_raw['costprice']>0) & (train_raw['pro_day']>0) & (train_raw['distance_day']>=0) & (train_raw['promotion_type']>0)]  # 将逻辑异常的样本剔除
