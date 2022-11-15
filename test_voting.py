@@ -54,16 +54,9 @@ pd.set_option('display.max_columns', None)
 # pd.options.display.max_columns = None
 # pd.options.display.max_rows = None
 
-# cpnid, organ = '0042', '1038'
-# bucket_name = 'wuerp-nx'
-# train_ori = get_data_from_s3(bucket_name, 'train', cpnid, organ)
-# train_ori.to_csv('/Users/ZC/Documents/company/promotion/0042-1038-train.csv', index=False)
-# print('\n', '促销样本量：%.d' % (len(train_ori)-train_ori.isna().sum().max()), '\n')
-# print('促销样本占总样本的百分比：%.3f' % ((1-train_ori.isna().sum().max()/len(train_ori))*100), '\n')
 
 # 读取数据并做一些预处理和初步的特征工程
-train_ori = pd.read_csv('/Users/ZC/Documents/company/promotion/0042-1038-train.csv')
-# train_ori = pd.read_csv('/Users/ZC/Documents/company/promotion/0042/1021/train.csv')
+train_ori = pd.read_csv('/Users/ZC/Documents/company/promotion/train.csv')
 print(train_ori.isnull().sum(), '\n')
 # train_ori = train_ori[train_ori['flag'] == '促销']
 train_ori = train_ori[(train_ori['price']>0) & (train_ori['costprice']>0) & (train_ori['pro_day']>0) & (train_ori['distance_day']>=0) & (train_ori['promotion_type']>0)]  # 将逻辑异常的样本剔除
@@ -244,7 +237,7 @@ mape_final = re.mape(y_true=result['y'], y_pred=result['yhat'])
 rmse_final = re.rmse(y_true=result['y'], y_pred=result['yhat'])
 r2_final = round(metrics.r2_score(y_true=result['y'], y_pred=result['yhat']), 4)
 print(smape_final, mape_final, rmse_final, r2_final)
-result.to_csv('/Users/ZC/Documents/company/promotion/result/0042-1038-1019-01-90%-targetnorm-indepyj-boostingvoting.csv')
+result.to_csv('/Users/ZC/Documents/company/promotion/result/90%-targetnorm-indepyj-boostingvoting.csv')
 print('\n', tuning, '\n', no_tune)
 
 # interpret_model(best3[0], plot='correlation')
