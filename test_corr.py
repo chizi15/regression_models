@@ -35,17 +35,9 @@ feat = cate_feat + numb_feat  # 22
 feat_lunar = cate_feat + numb_feat_lunar  # 22
 flexible = ['festival_num', 'mark_1', 'mark_2']  # 3
 
-# cpnid, organ = '0042', '1038'
-# bucket_name = 'wuerp-nx'
-# train_raw = get_data_from_s3(bucket_name, 'train', cpnid, organ)
-# train_raw.to_csv('/Users/ZC/Documents/company/promotion/0042-1038-train.csv', index=False)
-# print('\n', '促销样本量：%.d' % (len(train_raw)-train_raw.isna().sum().max()), '\n')
-# print('促销样本占总样本的百分比：%.3f' % ((1-train_raw.isna().sum().max()/len(train_raw))*100), '\n')
-
 
 # 读取数据并做一些预处理和初步的特征工程
-train_raw = pd.read_csv('/Users/ZC/Documents/company/promotion/0042-1038-train.csv')
-# train_raw = pd.read_csv('/Users/ZC/Documents/company/promotion/0042/1021/train.csv')
+train_raw = pd.read_csv('/Users/ZC/Documents/company/promotion/train.csv')
 print('train_raw.isnull().sum():', '\n', train_raw.isnull().sum(), '\n')
 # train_raw = train_raw[train_raw['flag'] == '促销']
 train_raw = train_raw[(train_raw['price']>0) & (train_raw['costprice']>0) & (train_raw['pro_day']>0) & (train_raw['distance_day']>=0) & (train_raw['promotion_type']>0)]  # 将逻辑异常的样本剔除
@@ -374,11 +366,4 @@ result_mean.loc[result_mean['SDR'] == np.inf, 'SDR'] = 2*abs(result_mean['amount
 # when (result_mean['amount'] + result_mean['yhat'])==0 and 2*abs(result_mean['amount'] - result_mean['yhat'])==0, result_mean['SDR'] is NaN, then completely acurate
 result_mean.loc[pd.isna(result_mean['SDR']), 'SDR'] = 0
 result_mean['y'] = result_mean['amount']
-result_mean.to_csv('/Users/ZC/Documents/company/promotion/result/0042-1038-0125-corr_pl-90%-y_log-indepyj-boostingavg-n_select=3.csv')
-
-"""
-1.1651 0.6075 9.77108141919013 0.796
-0.9225 0.5263 11.641784773144042 0.7308
-1.1919 0.4077 8.721994820209305 0.64
-0.976 0.3861 3.7745797986909086 0.7047
-"""
+result_mean.to_csv('/Users/ZC/Documents/company/promotion/result/corr_pl-90%-y_log-indepyj-boostingavg-n_select=3.csv')
