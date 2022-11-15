@@ -261,5 +261,5 @@ result_mean.loc[result_mean['SDR'] == np.inf, 'SDR'] = 2*abs(result_mean['amount
 # when (result_mean['amount'] + result_mean['yhat'])==0 and 2*abs(result_mean['amount'] - result_mean['yhat'])==0, result_mean['SDR'] is NaN, then completely acurate
 result_mean.loc[pd.isna(result_mean['SDR']), 'SDR'] = 0
 result_mean['y'] = result_mean['amount']
-result_mean.to_csv('/Users/ZC/Documents/company/promotion/result/0042-1038-1119-01-90%-targetlog-indepnorm-boostingavg-n_select=3.csv')
+result_mean.to_csv('/Users/ZC/Documents/company/promotion/result/90%-targetlog-indepnorm-boostingavg-n_select=3.csv')
 print('模型训练时触发try：', '\n', tuning, '\n', no_tune)
